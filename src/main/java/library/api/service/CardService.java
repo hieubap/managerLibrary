@@ -4,6 +4,9 @@ import library.api.entity.Book;
 import library.api.entity.CardLibrary;
 import library.api.entity.Session;
 import library.api.exception.ApiRequestException;
+import library.api.exception.cardlibraryexception.CardLibraryNotFoundException;
+import library.api.exception.generalexception.ServerErrorException;
+import library.api.exception.studentexception.StudentNotFoundException;
 import library.api.repository.CardRepository;
 import library.api.repository.StudentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,61 +29,84 @@ public class CardService {
     public CardService(CardRepository repositoryCard,
                        StudentRepository studentRepo,
                        BookService bookService,
-                       SessionService sessionService){
+                       SessionService sessionService) {
         this.repositoryCard = repositoryCard;
         this.studentRepo = studentRepo;
         this.bookService = bookService;
         this.sessionService = sessionService;
     }
 
-    public CardLibrary getByMssv(String mssv){
-        if(!isExist(mssv)){
-            throw new ApiRequestException("this student don't have card library ! check id");
+    public CardLibrary getByMssv(String mssv) {
+        try {
+            if (!isExist(mssv)) {
+                throw new StudentNotFoundException();
+            }
+            return repositoryCard.findByMssv(mssv);
+        } catch (ServerErrorException serverErrorException) {
+            throw new ServerErrorException();
         }
-        return repositoryCard.findByMssv(mssv);
+
     }
-    public CardLibrary getbyID(Long id){
-        if(!isExist(id)){
-            throw new ApiRequestException("this id is not exist ! check id");
+
+    public CardLibrary getbyID(Long id) {
+        try {
+            if (!isExist(id)) {
+                throw new CardLibraryNotFoundException();
+            }
+            return repositoryCard.getOne(id);
+        } catch (ServerErrorException serverErrorException) {
+            throw new ServerErrorException();
         }
-        return repositoryCard.getOne(id);
+
     }
-    public List<CardLibrary> getAll(){
-        return repositoryCard.findAll();
+
+    public List<CardLibrary> getAll() {
+        try {
+            List<CardLibrary> cardLibraries = repositoryCard.findAll();
+            if (cardLibraries == null) {
+                throw new CardLibraryNotFoundException();
+            }
+            return cardLibraries;
+        } catch (ServerErrorException serverErrorException) {
+            throw new ServerErrorException();
+        }
+
     }
-    public boolean isExist(String mssv){
+
+    public boolean isExist(String mssv) {
         return repositoryCard.existsByMssv(mssv);
     }
-    public boolean isExist(Long id){
+
+    public boolean isExist(Long id) {
         return repositoryCard.existsById(id);
     }
 
     //************************
-    public void add(CardLibrary cardLibrary){
-        if(cardLibrary.getMssv() == null){
-            throw new ApiRequestException( "mssv cant null.");
+    public void add(CardLibrary cardLibrary) {
+        if (cardLibrary.getMssv() == null) {
+            throw new ApiRequestException("mssv cant null.");// ve viet sau
         }
 
-        if(!studentRepo.existsByMssv(cardLibrary.getMssv()))
-            throw new ApiRequestException( "this student is not exist");
+        if (!studentRepo.existsByMssv(cardLibrary.getMssv()))
+            throw new StudentNotFoundException();
 
-        if (isExist(cardLibrary.getMssv())){
-            System.out.println("This student already has a library card ( mssv : " + cardLibrary.getMssv() + ")");
-            throw new ApiRequestException( "This student already has a library card ( mssv : " + cardLibrary.getMssv() + ")");
+        if (isExist(cardLibrary.getMssv())) {
+            //System.out.println("This student already has a library card ( mssv : " + cardLibrary.getMssv() + ")");
+            throw new ApiRequestException("This student already has a library card ( mssv : " + cardLibrary.getMssv() + ")");
         }
 
         cardLibrary.setStatus("con han");
-
-        long year = TimeUnit.MILLISECONDS.convert(365,TimeUnit.DAYS);
-        cardLibrary.setExpiration_date(new Timestamp(System.currentTimeMillis()+year));
-        String idstudent = cardLibrary.getMssv();
-        cardLibrary.setStudentId(studentRepo.getByMssv(idstudent).getId());
+        long year = TimeUnit.MILLISECONDS.convert(365, TimeUnit.DAYS);
+        cardLibrary.setExpiration_date(new Timestamp(System.currentTimeMillis() + year));
+        String idStudent = cardLibrary.getMssv();
+        cardLibrary.setStudentId(studentRepo.getByMssv(idStudent).getId());
 
         repositoryCard.save(cardLibrary);
     }
-    public CardLibrary update(CardLibrary cardLibrary,Long id){
-        if (!isExist(id)){
-            throw new ApiRequestException("this id is not exist");
+
+    public CardLibrary update(CardLibrary cardLibrary, Long id) {
+        if (!isExist(id)) {
+            throw new CardLibraryNotFoundException();
         }
         CardLibrary cardLibrary1 = repositoryCard.getOne(id);
         cardLibrary1.set(cardLibrary);
@@ -88,19 +114,25 @@ public class CardService {
 
         return cardLibrary1;
     }
-    public void back(Long id){
-        Session session =  sessionService.getbyID(id);
+
+    public void back(Long id) {
+        Session session = sessionService.getbyID(id);
         session.setStatus("da tra");
-        sessionService.update(session,id);
+        sessionService.update(session, id);
 
         Book book = bookService.getById(session.getIdBook());
         book.setStatus("binh thuong");
-//        bookService.updateBook(book);
     }
-    public void delete(long id){
-        if(!isExist(id)){
-            throw new ApiRequestException("this id is not exist");
+
+    public void delete(long id) {
+        try {
+            if (!isExist(id)) {
+                throw new CardLibraryNotFoundException();
+            }
+            repositoryCard.deleteById(id);
+        } catch (ServerErrorException serverErrorException) {
+            throw new ServerErrorException();
         }
-        repositoryCard.deleteById(id);
+
     }
 }
